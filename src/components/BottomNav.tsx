@@ -12,6 +12,8 @@ const navItems = [
 export function BottomNav() {
   const location = useLocation();
 
+  if (location.pathname === '/auth') return null;
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-lg">
       <div className="flex items-center justify-around py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">

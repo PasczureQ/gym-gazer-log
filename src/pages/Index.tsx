@@ -1,17 +1,50 @@
 import { useWorkoutStore } from '@/stores/workoutStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { ActiveWorkout } from '@/components/ActiveWorkout';
 import { WorkoutCard } from '@/components/WorkoutCard';
 import { Button } from '@/components/ui/button';
 import { Flame, Dumbbell, TrendingUp, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useEffect } from 'react';
+import { fetchWorkoutsFromCloud, saveWorkoutToCloud, deleteWorkoutFromCloud } from '@/lib/cloudSync';
+import { toast } from 'sonner';
 
 const HomePage = () => {
-  const { workouts, activeWorkout, startWorkout } = useWorkoutStore();
+  const { workouts, activeWorkout, startWorkout, setWorkouts, finishWorkout, deleteWorkout } = useWorkoutStore();
+  const { user } = useAuth();
+
+  // Load workouts from cloud on mount
+  useEffect(() => {
+    if (!user) return;
+    fetchWorkoutsFromCloud(user.id).then(cloudWorkouts => {
+      if (cloudWorkouts.length > 0) setWorkouts(cloudWorkouts);
+    });
+  }, [user]);
+
+  const handleFinishWorkout = async () => {
+    const finished = finishWorkout();
+    if (finished && user) {
+      try {
+        await saveWorkoutToCloud(finished, user.id);
+        // Reload from cloud to get proper IDs
+        const fresh = await fetchWorkoutsFromCloud(user.id);
+        setWorkouts(fresh);
+        toast.success('Workout saved to cloud!');
+      } catch (err) {
+        toast.error('Failed to sync workout');
+      }
+    }
+  };
+
+  const handleDeleteWorkout = async (id: string) => {
+    deleteWorkout(id);
+    try {
+      await deleteWorkoutFromCloud(id);
+    } catch {}
+  };
 
   const thisWeek = workouts.filter(w => {
-    const d = new Date(w.date);
-    const now = new Date();
-    const diff = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+    const diff = (Date.now() - new Date(w.date).getTime()) / (1000 * 60 * 60 * 24);
     return diff <= 7;
   });
 
@@ -22,9 +55,8 @@ const HomePage = () => {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dayStr = date.toISOString().split('T')[0];
-      if (workouts.some(w => w.date.startsWith(dayStr))) {
-        count++;
-      } else if (i > 0) break;
+      if (workouts.some(w => w.date.startsWith(dayStr))) count++;
+      else if (i > 0) break;
     }
     return count;
   })();
@@ -38,73 +70,38 @@ const HomePage = () => {
   if (activeWorkout) {
     return (
       <div className="min-h-screen px-4 pt-6 pb-24">
-        <ActiveWorkout />
+        <ActiveWorkout onFinish={handleFinishWorkout} />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen px-4 pt-6 pb-24">
-      {/* Hero */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-display text-4xl tracking-wider">RAT WORKOUTS</h1>
         <p className="text-muted-foreground text-sm">Train hard. Track everything.</p>
       </motion.div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-lg border border-border bg-card p-3 text-center"
-        >
-          <Flame className="mx-auto h-5 w-5 text-primary mb-1" />
-          <p className="text-display text-2xl">{streak}</p>
-          <p className="text-xs text-muted-foreground">Day streak</p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="rounded-lg border border-border bg-card p-3 text-center"
-        >
-          <Dumbbell className="mx-auto h-5 w-5 text-primary mb-1" />
-          <p className="text-display text-2xl">{thisWeek.length}</p>
-          <p className="text-xs text-muted-foreground">This week</p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-lg border border-border bg-card p-3 text-center"
-        >
-          <TrendingUp className="mx-auto h-5 w-5 text-primary mb-1" />
-          <p className="text-display text-2xl">{totalVolume > 0 ? `${(totalVolume / 1000).toFixed(1)}` : '0'}</p>
-          <p className="text-xs text-muted-foreground">Tons lifted</p>
-        </motion.div>
+        {[
+          { icon: Flame, value: streak, label: 'Day streak', delay: 0.1 },
+          { icon: Dumbbell, value: thisWeek.length, label: 'This week', delay: 0.15 },
+          { icon: TrendingUp, value: totalVolume > 0 ? `${(totalVolume / 1000).toFixed(1)}` : '0', label: 'Tons lifted', delay: 0.2 },
+        ].map(({ icon: Icon, value, label, delay }) => (
+          <motion.div key={label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }} className="rounded-lg border border-border bg-card p-3 text-center">
+            <Icon className="mx-auto h-5 w-5 text-primary mb-1" />
+            <p className="text-display text-2xl">{value}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
+          </motion.div>
+        ))}
       </div>
 
-      {/* Start workout */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-      >
-        <Button
-          className="w-full h-14 text-lg font-bold glow-red mb-6"
-          onClick={() => startWorkout('Workout')}
-        >
-          <Zap className="mr-2 h-5 w-5" />
-          START WORKOUT
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+        <Button className="w-full h-14 text-lg font-bold glow-red mb-6" onClick={() => startWorkout('Workout')}>
+          <Zap className="mr-2 h-5 w-5" /> START WORKOUT
         </Button>
       </motion.div>
 
-      {/* Recent workouts */}
       <div>
         <h2 className="text-display text-xl mb-3">RECENT WORKOUTS</h2>
         {workouts.length === 0 ? (
@@ -115,7 +112,7 @@ const HomePage = () => {
         ) : (
           <div className="space-y-3">
             {workouts.slice(0, 5).map(w => (
-              <WorkoutCard key={w.id} workout={w} />
+              <WorkoutCard key={w.id} workout={w} onDelete={handleDeleteWorkout} />
             ))}
           </div>
         )}

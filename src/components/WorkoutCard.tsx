@@ -1,14 +1,13 @@
 import { Workout, MUSCLE_GROUP_LABELS } from '@/types/workout';
 import { formatDistanceToNow } from 'date-fns';
 import { Clock, Dumbbell, Trash2 } from 'lucide-react';
-import { useWorkoutStore } from '@/stores/workoutStore';
 
 interface WorkoutCardProps {
   workout: Workout;
+  onDelete?: (id: string) => void;
 }
 
-export function WorkoutCard({ workout }: WorkoutCardProps) {
-  const { deleteWorkout } = useWorkoutStore();
+export function WorkoutCard({ workout, onDelete }: WorkoutCardProps) {
   const totalSets = workout.exercises.reduce((acc, e) => acc + e.sets.length, 0);
   const totalVolume = workout.exercises.reduce(
     (acc, e) => acc + e.sets.reduce((a, s) => a + s.weight * s.reps, 0), 0
@@ -24,28 +23,19 @@ export function WorkoutCard({ workout }: WorkoutCardProps) {
             {formatDistanceToNow(new Date(workout.date), { addSuffix: true })}
           </p>
         </div>
-        <button
-          onClick={() => deleteWorkout(workout.id)}
-          className="text-muted-foreground hover:text-destructive transition-colors p-1"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {onDelete && (
+          <button onClick={() => onDelete(workout.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1">
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="flex gap-3 text-sm text-muted-foreground mb-3">
         {workout.duration && (
-          <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {workout.duration}m
-          </span>
+          <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{workout.duration}m</span>
         )}
-        <span className="flex items-center gap-1">
-          <Dumbbell className="h-3.5 w-3.5" />
-          {totalSets} sets
-        </span>
-        {totalVolume > 0 && (
-          <span>{(totalVolume / 1000).toFixed(1)}t vol</span>
-        )}
+        <span className="flex items-center gap-1"><Dumbbell className="h-3.5 w-3.5" />{totalSets} sets</span>
+        {totalVolume > 0 && <span>{(totalVolume / 1000).toFixed(1)}t vol</span>}
       </div>
 
       <div className="flex flex-wrap gap-1">
@@ -60,11 +50,6 @@ export function WorkoutCard({ workout }: WorkoutCardProps) {
         {workout.exercises.map(we => (
           <div key={we.id} className="text-sm text-secondary-foreground">
             {we.sets.length}× {we.exercise.name}
-            <span className="text-muted-foreground ml-1">
-              {we.sets.filter(s => s.completed).length > 0 &&
-                `(best: ${Math.max(...we.sets.map(s => s.weight))}kg × ${Math.max(...we.sets.filter(s => s.weight === Math.max(...we.sets.map(ss => ss.weight))).map(s => s.reps))})`
-              }
-            </span>
           </div>
         ))}
       </div>

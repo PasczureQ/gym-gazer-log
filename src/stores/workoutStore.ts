@@ -6,9 +6,10 @@ interface WorkoutState {
   workouts: Workout[];
   activeWorkout: Workout | null;
   
+  setWorkouts: (workouts: Workout[]) => void;
   startWorkout: (name: string) => void;
   cancelWorkout: () => void;
-  finishWorkout: () => void;
+  finishWorkout: () => Workout | null;
   
   addExerciseToWorkout: (exercise: Exercise) => void;
   removeExerciseFromWorkout: (exerciseId: string) => void;
@@ -30,6 +31,8 @@ export const useWorkoutStore = create<WorkoutState>()(
       workouts: [],
       activeWorkout: null,
 
+      setWorkouts: (workouts) => set({ workouts }),
+
       startWorkout: (name) => {
         const workout: Workout = {
           id: genId(),
@@ -45,9 +48,10 @@ export const useWorkoutStore = create<WorkoutState>()(
 
       finishWorkout: () => {
         const { activeWorkout, workouts } = get();
-        if (!activeWorkout) return;
+        if (!activeWorkout) return null;
         const finished = { ...activeWorkout, completed: true, duration: Math.floor((Date.now() - new Date(activeWorkout.date).getTime()) / 60000) };
         set({ workouts: [finished, ...workouts], activeWorkout: null });
+        return finished;
       },
 
       addExerciseToWorkout: (exercise) => {

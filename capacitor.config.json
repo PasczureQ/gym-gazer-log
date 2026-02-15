@@ -1,0 +1,9 @@
+{
+  "appId": "app.lovable.e9aabecb6679489db3981b8358893739",
+  "appName": "Rat Workouts",
+  "webDir": "dist",
+  "server": {
+    "url": "https://e9aabecb-6679-489d-b398-1b8358893739.lovableproject.com?forceHideBadge=true",
+    "cleartext": true
+  }
+}

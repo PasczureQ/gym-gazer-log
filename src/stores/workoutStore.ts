@@ -123,6 +123,6 @@ export const useWorkoutStore = create<WorkoutState>()(
         set({ workouts: get().workouts.filter(w => w.id !== workoutId) });
       },
     }),
-    { name: 'rat-workouts-storage' }
+    { name: 'fitforge-storage' }
   )
 );

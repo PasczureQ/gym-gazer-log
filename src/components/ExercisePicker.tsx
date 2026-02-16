@@ -4,26 +4,38 @@ import { exercises, searchExercises } from '@/data/exercises';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MuscleMap } from '@/components/MuscleMap';
-import { Search, X, ChevronDown } from 'lucide-react';
+import { Search, X, ChevronDown, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ExercisePickerProps {
   onSelect: (exercise: Exercise) => void;
   onClose: () => void;
+  multiSelect?: boolean;
+  onMultiSelect?: (exercises: Exercise[]) => void;
 }
 
 const muscleGroups = Object.keys(MUSCLE_GROUP_LABELS) as MuscleGroup[];
 
-export function ExercisePicker({ onSelect, onClose }: ExercisePickerProps) {
+export function ExercisePicker({ onSelect, onClose, multiSelect, onMultiSelect }: ExercisePickerProps) {
   const [query, setQuery] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | null>(null);
   const [previewExercise, setPreviewExercise] = useState<Exercise | null>(null);
+  const [selected, setSelected] = useState<Exercise[]>([]);
 
   const filtered = query
     ? searchExercises(query)
     : selectedMuscle
       ? exercises.filter(e => e.muscleGroup === selectedMuscle)
       : exercises;
+
+  const toggleSelected = (ex: Exercise) => {
+    if (selected.some(s => s.id === ex.id)) {
+      setSelected(selected.filter(s => s.id !== ex.id));
+    } else {
+      setSelected([...selected, ex]);
+    }
+  };
 
   return (
     <motion.div
@@ -37,7 +49,12 @@ export function ExercisePicker({ onSelect, onClose }: ExercisePickerProps) {
         <button onClick={onClose} className="text-muted-foreground">
           <X className="h-5 w-5" />
         </button>
-        <h2 className="text-display text-xl">SELECT EXERCISE</h2>
+        <h2 className="text-display text-xl flex-1">SELECT EXERCISE</h2>
+        {multiSelect && selected.length > 0 && (
+          <Button size="sm" onClick={() => onMultiSelect?.(selected)}>
+            Add {selected.length}
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -116,23 +133,32 @@ export function ExercisePicker({ onSelect, onClose }: ExercisePickerProps) {
 
       {/* Exercise list */}
       <div className="flex-1 overflow-y-auto">
-        {filtered.map(ex => (
-          <button
-            key={ex.id}
-            className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-secondary active:bg-secondary/80 border-b border-border/50"
-            onClick={() => onSelect(ex)}
-            onMouseEnter={() => setPreviewExercise(ex)}
-            onTouchStart={() => setPreviewExercise(ex)}
-          >
-            <div>
-              <p className="font-medium">{ex.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {MUSCLE_GROUP_LABELS[ex.muscleGroup]} · {EQUIPMENT_LABELS[ex.equipment]}
-              </p>
-            </div>
-            <ChevronDown className="h-4 w-4 rotate-[-90deg] text-muted-foreground" />
-          </button>
-        ))}
+        {filtered.map(ex => {
+          const isSelected = selected.some(s => s.id === ex.id);
+          return (
+            <button
+              key={ex.id}
+              className={`flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-secondary active:bg-secondary/80 border-b border-border/50 ${isSelected ? 'bg-primary/10' : ''}`}
+              onClick={() => multiSelect ? toggleSelected(ex) : onSelect(ex)}
+              onMouseEnter={() => setPreviewExercise(ex)}
+              onTouchStart={() => setPreviewExercise(ex)}
+            >
+              <div>
+                <p className="font-medium">{ex.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {MUSCLE_GROUP_LABELS[ex.muscleGroup]} · {EQUIPMENT_LABELS[ex.equipment]}
+                </p>
+              </div>
+              {multiSelect ? (
+                <div className={`h-5 w-5 rounded border ${isSelected ? 'bg-primary border-primary' : 'border-border'} flex items-center justify-center`}>
+                  {isSelected && <Plus className="h-3 w-3 text-primary-foreground rotate-45" />}
+                </div>
+              ) : (
+                <ChevronDown className="h-4 w-4 rotate-[-90deg] text-muted-foreground" />
+              )}
+            </button>
+          );
+        })}
       </div>
     </motion.div>
   );

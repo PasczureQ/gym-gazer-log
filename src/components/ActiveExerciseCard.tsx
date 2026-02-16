@@ -8,13 +8,22 @@ import { useState } from 'react';
 
 interface ActiveExerciseCardProps {
   workoutExercise: WorkoutExercise;
+  onSetCompleted?: () => void;
 }
 
 const setTypes: SetType[] = ['warmup', 'normal', 'failure', 'drop', 'superset', 'assisted', 'tempo'];
 
-export function ActiveExerciseCard({ workoutExercise }: ActiveExerciseCardProps) {
+export function ActiveExerciseCard({ workoutExercise, onSetCompleted }: ActiveExerciseCardProps) {
   const { addSet, updateSet, removeSet, toggleSetComplete, removeExerciseFromWorkout } = useWorkoutStore();
   const [showTypeDropdown, setShowTypeDropdown] = useState<string | null>(null);
+
+  const handleToggleComplete = (setId: string, wasCompleted: boolean) => {
+    toggleSetComplete(workoutExercise.id, setId);
+    // If we're completing (not uncompleting), trigger rest timer
+    if (!wasCompleted && onSetCompleted) {
+      onSetCompleted();
+    }
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-4 animate-slide-up">
@@ -94,7 +103,7 @@ export function ActiveExerciseCard({ workoutExercise }: ActiveExerciseCardProps)
             placeholder="0"
           />
           <button
-            onClick={() => toggleSetComplete(workoutExercise.id, s.id)}
+            onClick={() => handleToggleComplete(s.id, s.completed)}
             className={cn(
               'flex h-8 w-8 items-center justify-center rounded transition-colors',
               s.completed ? 'bg-success text-success-foreground' : 'bg-secondary text-muted-foreground'

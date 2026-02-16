@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Workout, WorkoutExercise, WorkoutSet, Exercise, SetType } from '@/types/workout';
+import { Workout, WorkoutExercise, WorkoutSet, Exercise, SetType, Routine } from '@/types/workout';
 
 interface WorkoutState {
   workouts: Workout[];
   activeWorkout: Workout | null;
+  routines: Routine[];
+  restTimerSeconds: number; // default rest time in seconds
   
   setWorkouts: (workouts: Workout[]) => void;
   startWorkout: (name: string) => void;
+  startFromRoutine: (routine: Routine) => void;
   cancelWorkout: () => void;
   finishWorkout: () => Workout | null;
   
@@ -20,6 +23,11 @@ interface WorkoutState {
   toggleSetComplete: (workoutExerciseId: string, setId: string) => void;
   
   deleteWorkout: (workoutId: string) => void;
+
+  // Routines
+  addRoutine: (routine: Routine) => void;
+  deleteRoutine: (routineId: string) => void;
+  setRestTimerSeconds: (seconds: number) => void;
 }
 
 let idCounter = 0;
@@ -30,6 +38,8 @@ export const useWorkoutStore = create<WorkoutState>()(
     (set, get) => ({
       workouts: [],
       activeWorkout: null,
+      routines: [],
+      restTimerSeconds: 90,
 
       setWorkouts: (workouts) => set({ workouts }),
 
@@ -42,6 +52,32 @@ export const useWorkoutStore = create<WorkoutState>()(
           completed: false,
         };
         set({ activeWorkout: workout });
+      },
+
+      startFromRoutine: (routine) => {
+        const exercises: WorkoutExercise[] = routine.exercises.map(re => ({
+          id: genId(),
+          exercise: re.exercise,
+          sets: Array.from({ length: re.defaultSets }, () => ({
+            id: genId(),
+            weight: 0,
+            reps: 0,
+            type: 'normal' as SetType,
+            completed: false,
+          })),
+        }));
+        const workout: Workout = {
+          id: genId(),
+          name: routine.name,
+          date: new Date().toISOString(),
+          exercises,
+          completed: false,
+        };
+        // Update lastUsed on routine
+        const routines = get().routines.map(r =>
+          r.id === routine.id ? { ...r, lastUsed: new Date().toISOString() } : r
+        );
+        set({ activeWorkout: workout, routines });
       },
 
       cancelWorkout: () => set({ activeWorkout: null }),
@@ -121,6 +157,18 @@ export const useWorkoutStore = create<WorkoutState>()(
 
       deleteWorkout: (workoutId) => {
         set({ workouts: get().workouts.filter(w => w.id !== workoutId) });
+      },
+
+      addRoutine: (routine) => {
+        set({ routines: [routine, ...get().routines] });
+      },
+
+      deleteRoutine: (routineId) => {
+        set({ routines: get().routines.filter(r => r.id !== routineId) });
+      },
+
+      setRestTimerSeconds: (seconds) => {
+        set({ restTimerSeconds: seconds });
       },
     }),
     { name: 'fitforge-storage' }

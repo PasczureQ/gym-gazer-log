@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { Button } from '@/components/ui/button';
 import { ActiveExerciseCard } from '@/components/ActiveExerciseCard';
 import { ExercisePicker } from '@/components/ExercisePicker';
+import { RestTimer } from '@/components/RestTimer';
 import { Plus, Square, Timer } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -10,10 +11,37 @@ interface ActiveWorkoutProps {
   onFinish?: () => void;
 }
 
+function useElapsedTime(startDate: string) {
+  const [elapsed, setElapsed] = useState('00:00:00');
+  useEffect(() => {
+    const start = new Date(startDate).getTime();
+    const tick = () => {
+      const diff = Math.floor((Date.now() - start) / 1000);
+      const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+      const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+      const s = String(diff % 60).padStart(2, '0');
+      setElapsed(`${h}:${m}:${s}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startDate]);
+  return elapsed;
+}
+
 export function ActiveWorkout({ onFinish }: ActiveWorkoutProps) {
-  const { activeWorkout, finishWorkout, cancelWorkout, addExerciseToWorkout } = useWorkoutStore();
+  const { activeWorkout, finishWorkout, cancelWorkout, addExerciseToWorkout, restTimerSeconds } = useWorkoutStore();
   const [showPicker, setShowPicker] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
+  const [showRestTimer, setShowRestTimer] = useState(false);
+
+  const elapsed = useElapsedTime(activeWorkout?.date || new Date().toISOString());
+
+  const handleSetCompleted = useCallback(() => {
+    if (restTimerSeconds > 0) {
+      setShowRestTimer(true);
+    }
+  }, [restTimerSeconds]);
 
   if (!activeWorkout) return null;
 
@@ -38,7 +66,7 @@ export function ActiveWorkout({ onFinish }: ActiveWorkoutProps) {
             <h2 className="text-display text-2xl">{activeWorkout.name || 'Workout'}</h2>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Timer className="h-3.5 w-3.5" />
-              <span>In progress</span>
+              <span className="font-mono text-primary font-semibold">{elapsed}</span>
               <span>·</span>
               <span>{completedSets}/{totalSets} sets</span>
             </div>
@@ -56,7 +84,7 @@ export function ActiveWorkout({ onFinish }: ActiveWorkoutProps) {
 
         <AnimatePresence>
           {activeWorkout.exercises.map(we => (
-            <ActiveExerciseCard key={we.id} workoutExercise={we} />
+            <ActiveExerciseCard key={we.id} workoutExercise={we} onSetCompleted={handleSetCompleted} />
           ))}
         </AnimatePresence>
 
@@ -73,6 +101,16 @@ export function ActiveWorkout({ onFinish }: ActiveWorkoutProps) {
           </Button>
         </div>
       </div>
+
+      {/* Rest Timer Overlay */}
+      <AnimatePresence>
+        {showRestTimer && (
+          <RestTimer
+            seconds={restTimerSeconds}
+            onDismiss={() => setShowRestTimer(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showCancel && (

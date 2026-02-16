@@ -46,6 +46,15 @@ export interface Workout {
   completed: boolean;
 }
 
+// A saved routine template
+export interface Routine {
+  id: string;
+  name: string;
+  exercises: { exercise: Exercise; defaultSets: number }[];
+  createdAt: string;
+  lastUsed?: string;
+}
+
 export interface UserProfile {
   username: string;
   weight?: number;

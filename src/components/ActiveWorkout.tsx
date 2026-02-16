@@ -35,7 +35,7 @@ export function ActiveWorkout({ onFinish }: ActiveWorkoutProps) {
       <div className="space-y-4 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-display text-2xl">{activeWorkout.name}</h2>
+            <h2 className="text-display text-2xl">{activeWorkout.name || 'Workout'}</h2>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Timer className="h-3.5 w-3.5" />
               <span>In progress</span>

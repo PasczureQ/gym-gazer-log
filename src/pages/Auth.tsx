@@ -52,9 +52,9 @@ const AuthPage = () => {
       >
         <div className="mb-8 text-center">
           <Dumbbell className="mx-auto h-12 w-12 text-primary mb-3" />
-          <h1 className="text-display text-4xl tracking-wider">RAT WORKOUTS</h1>
+          <h1 className="text-display text-4xl tracking-wider">FITFORGE</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {isLogin ? 'Welcome back, beast.' : 'Join the pack.'}
+            {isLogin ? 'Welcome back, beast.' : 'Join the forge.'}
           </p>
         </div>
 
@@ -95,7 +95,7 @@ const AuthPage = () => {
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {message && <p className="text-sm text-success">{message}</p>}
+          {message && <p className="text-sm text-primary">{message}</p>}
 
           <Button type="submit" className="w-full glow-red" disabled={submitting}>
             {submitting ? '...' : isLogin ? 'Sign In' : 'Create Account'}

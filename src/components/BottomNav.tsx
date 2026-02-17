@@ -1,10 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, Dumbbell, BarChart3, User } from 'lucide-react';
+import { Home, Dumbbell, BarChart3, User, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/workouts', icon: Dumbbell, label: 'Workouts' },
+  { to: '/social', icon: Users, label: 'Social' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/profile', icon: User, label: 'Profile' },
 ];
@@ -12,7 +13,7 @@ const navItems = [
 export function BottomNav() {
   const location = useLocation();
 
-  if (location.pathname === '/auth') return null;
+  if (location.pathname === '/auth' || location.pathname.startsWith('/user/')) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-lg">
@@ -24,7 +25,7 @@ export function BottomNav() {
               key={to}
               to={to}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors',
+                'flex flex-col items-center gap-0.5 px-2 py-1 text-[10px] transition-colors',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )}
             >

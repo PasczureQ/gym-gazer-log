@@ -4,15 +4,13 @@ import { ActiveWorkout } from '@/components/ActiveWorkout';
 import { Button } from '@/components/ui/button';
 import { Flame, Dumbbell, TrendingUp, Zap, User } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useEffect, useMemo } from 'react';
-import { fetchWorkoutsFromCloud, saveWorkoutToCloud, deleteWorkoutFromCloud } from '@/lib/cloudSync';
+import { useEffect } from 'react';
+import { fetchWorkoutsFromCloud, saveWorkoutToCloud } from '@/lib/cloudSync';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
-const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-
 const HomePage = () => {
-  const { workouts, activeWorkout, startWorkout, setWorkouts, finishWorkout, deleteWorkout, routines, startFromRoutine } = useWorkoutStore();
+  const { workouts, activeWorkout, startWorkout, setWorkouts, finishWorkout, routines, startFromRoutine } = useWorkoutStore();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -31,7 +29,7 @@ const HomePage = () => {
         const fresh = await fetchWorkoutsFromCloud(user.id);
         setWorkouts(fresh);
         toast.success('Workout saved to cloud!');
-      } catch (err) {
+      } catch {
         toast.error('Failed to sync workout');
       }
     }
@@ -60,22 +58,6 @@ const HomePage = () => {
       (a, e) => a + e.sets.reduce((s, set) => s + set.weight * set.reps, 0), 0
     ), 0
   );
-
-  const calendarData = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startPad = (firstDay.getDay() + 6) % 7;
-    const days: { date: number; hasWorkout: boolean; isCurrentMonth: boolean }[] = [];
-    for (let i = 0; i < startPad; i++) days.push({ date: 0, hasWorkout: false, isCurrentMonth: false });
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      days.push({ date: d, hasWorkout: workouts.some(w => w.date.startsWith(dateStr)), isCurrentMonth: true });
-    }
-    return days;
-  }, [workouts]);
 
   if (activeWorkout) {
     return (
@@ -118,7 +100,7 @@ const HomePage = () => {
         </Button>
       </motion.div>
 
-      {/* Saved Routines */}
+      {/* Recent Workouts & Routines */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
         <h2 className="text-display text-xl mb-3">RECENT ROUTINES</h2>
         {routines.length === 0 && workouts.length === 0 ? (
@@ -152,30 +134,31 @@ const HomePage = () => {
         )}
       </motion.div>
 
-      {/* Calendar */}
+      {/* Recent Workout History */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-        <h2 className="text-display text-xl mb-3">CALENDAR HEATMAP</h2>
-        <div className="rounded-lg border border-border bg-card p-3">
-          <div className="grid grid-cols-7 gap-1 mb-1">
-            {DAYS.map(d => (
-              <div key={d} className="text-center text-[10px] text-muted-foreground font-medium">{d}</div>
-            ))}
+        <h2 className="text-display text-xl mb-3">RECENT WORKOUTS</h2>
+        {workouts.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border p-6 text-center">
+            <p className="text-muted-foreground text-sm">Complete a workout to see it here</p>
           </div>
-          <div className="grid grid-cols-7 gap-1">
-            {calendarData.map((day, i) => (
-              <div
-                key={i}
-                className={`aspect-square rounded-sm flex items-center justify-center text-[10px] ${
-                  !day.isCurrentMonth ? '' : day.hasWorkout
-                    ? 'bg-primary text-primary-foreground font-bold'
-                    : 'bg-secondary text-muted-foreground'
-                }`}
-              >
-                {day.isCurrentMonth ? day.date : ''}
+        ) : (
+          <div className="space-y-2">
+            {workouts.slice(0, 5).map(w => (
+              <div key={w.id} className="rounded-lg border border-border bg-card p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm">{w.name}</h3>
+                    <p className="text-[10px] text-muted-foreground">{new Date(w.date).toLocaleDateString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">{w.exercises.length} exercises</p>
+                    {w.duration && <p className="text-[10px] text-muted-foreground">{w.duration} min</p>}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-        </div>
+        )}
       </motion.div>
     </div>
   );

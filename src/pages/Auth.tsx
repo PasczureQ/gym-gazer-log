@@ -13,7 +13,6 @@ const AuthPage = () => {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (loading) {
@@ -29,7 +28,6 @@ const AuthPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setMessage('');
     setSubmitting(true);
 
     if (isLogin) {
@@ -38,7 +36,6 @@ const AuthPage = () => {
     } else {
       const { error } = await signUp(email, password, username);
       if (error) setError(error.message);
-      else setMessage('Check your email to confirm your account!');
     }
     setSubmitting(false);
   };
@@ -95,7 +92,6 @@ const AuthPage = () => {
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
-          {message && <p className="text-sm text-primary">{message}</p>}
 
           <Button type="submit" className="w-full glow-red" disabled={submitting}>
             {submitting ? '...' : isLogin ? 'Sign In' : 'Create Account'}
@@ -106,7 +102,7 @@ const AuthPage = () => {
         <p className="mt-6 text-center text-sm text-muted-foreground">
           {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
           <button
-            onClick={() => { setIsLogin(!isLogin); setError(''); setMessage(''); }}
+            onClick={() => { setIsLogin(!isLogin); setError(''); }}
             className="text-primary font-medium hover:underline"
           >
             {isLogin ? 'Sign Up' : 'Sign In'}

@@ -2,7 +2,7 @@ import { WorkoutExercise, WorkoutSet, SET_TYPE_LABELS, SetType, MUSCLE_GROUP_LAB
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Check, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { Check, Plus, Trash2, ChevronDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -19,7 +19,6 @@ export function ActiveExerciseCard({ workoutExercise, onSetCompleted }: ActiveEx
 
   const handleToggleComplete = (setId: string, wasCompleted: boolean) => {
     toggleSetComplete(workoutExercise.id, setId);
-    // If we're completing (not uncompleting), trigger rest timer
     if (!wasCompleted && onSetCompleted) {
       onSetCompleted();
     }
@@ -43,11 +42,12 @@ export function ActiveExerciseCard({ workoutExercise, onSetCompleted }: ActiveEx
       </div>
 
       {/* Header row */}
-      <div className="grid grid-cols-[40px_1fr_1fr_1fr_40px] gap-2 mb-1 text-xs text-muted-foreground font-medium px-1">
+      <div className="grid grid-cols-[28px_1fr_1fr_1fr_32px_32px] gap-1.5 mb-1 text-xs text-muted-foreground font-medium px-1">
         <span>SET</span>
         <span>TYPE</span>
         <span>KG</span>
         <span>REPS</span>
+        <span></span>
         <span></span>
       </div>
 
@@ -56,7 +56,7 @@ export function ActiveExerciseCard({ workoutExercise, onSetCompleted }: ActiveEx
         <div
           key={s.id}
           className={cn(
-            'grid grid-cols-[40px_1fr_1fr_1fr_40px] gap-2 items-center py-1.5 px-1 rounded',
+            'grid grid-cols-[28px_1fr_1fr_1fr_32px_32px] gap-1.5 items-center py-1.5 px-1 rounded',
             s.completed && 'bg-success/10'
           )}
         >
@@ -110,6 +110,12 @@ export function ActiveExerciseCard({ workoutExercise, onSetCompleted }: ActiveEx
             )}
           >
             <Check className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => removeSet(workoutExercise.id, s.id)}
+            className="flex h-8 w-8 items-center justify-center rounded bg-secondary text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <Minus className="h-3 w-3" />
           </button>
         </div>
       ))}

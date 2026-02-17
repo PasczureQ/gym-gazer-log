@@ -1,23 +1,35 @@
-import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { MuscleMap } from '@/components/MuscleMap';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Settings, Download, Upload, Trash2, ChevronRight, LogOut, Save, Moon, Sun, Cloud } from 'lucide-react';
+import { User, Download, Upload, Trash2, ChevronRight, LogOut, Save, Cloud, ChevronLeft, Calendar, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MuscleGroup, MUSCLE_GROUP_LABELS } from '@/types/workout';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { Workout, WorkoutExercise, WorkoutSet } from '@/types/workout';
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const MIN_YEAR = 1999;
 
 const ProfilePage = () => {
-  const { workouts } = useWorkoutStore();
+  const { workouts, setWorkouts } = useWorkoutStore();
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [profile, setProfile] = useState({ username: 'Gym Rat', weight: '', height: '', experience: 'beginner' });
+  const [profile, setProfile] = useState({ username: 'Gym Rat', weight: '', height: '', experience: 'beginner', isPrivate: true });
   const [editingProfile, setEditingProfile] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  // Calendar state
+  const now = new Date();
+  const [calMonth, setCalMonth] = useState(now.getMonth());
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -28,9 +40,13 @@ const ProfilePage = () => {
           weight: data.weight?.toString() || '',
           height: data.height?.toString() || '',
           experience: data.experience || 'beginner',
+          isPrivate: data.is_private,
         });
       }
     });
+    // Fetch follower/following counts
+    supabase.from('followers').select('id', { count: 'exact', head: true }).eq('following_id', user.id).then(({ count }) => setFollowerCount(count || 0));
+    supabase.from('followers').select('id', { count: 'exact', head: true }).eq('follower_id', user.id).then(({ count }) => setFollowingCount(count || 0));
   }, [user]);
 
   const saveProfile = async () => {
@@ -40,40 +56,46 @@ const ProfilePage = () => {
       weight: profile.weight ? Number(profile.weight) : null,
       height: profile.height ? Number(profile.height) : null,
       experience: profile.experience,
+      is_private: profile.isPrivate,
     }).eq('user_id', user.id);
     if (error) toast.error('Failed to save profile');
     else { toast.success('Profile saved!'); setEditingProfile(false); }
   };
 
-  // Calendar data for current month
-  const calendarData = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calYear, calMonth, 1);
+    const lastDay = new Date(calYear, calMonth + 1, 0);
     const startPad = (firstDay.getDay() + 6) % 7;
-    const days: { date: number; hasWorkout: boolean; isCurrentMonth: boolean }[] = [];
-
-    for (let i = 0; i < startPad; i++) {
-      days.push({ date: 0, hasWorkout: false, isCurrentMonth: false });
-    }
+    const days: { date: number; dateStr: string; hasWorkout: boolean; isCurrentMonth: boolean }[] = [];
+    for (let i = 0; i < startPad; i++) days.push({ date: 0, dateStr: '', hasWorkout: false, isCurrentMonth: false });
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const hasWorkout = workouts.some(w => w.date.startsWith(dateStr));
-      days.push({ date: d, hasWorkout, isCurrentMonth: true });
+      const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      days.push({ date: d, dateStr, hasWorkout: workouts.some(w => w.date.startsWith(dateStr)), isCurrentMonth: true });
     }
     return days;
-  }, [workouts]);
+  }, [workouts, calMonth, calYear]);
 
-  const handleExport = () => {
+  const selectedDayWorkouts = selectedDay ? workouts.filter(w => w.date.startsWith(selectedDay)) : [];
+
+  const prevMonth = () => {
+    if (calMonth === 0) { if (calYear > MIN_YEAR) { setCalMonth(11); setCalYear(y => y - 1); } }
+    else setCalMonth(m => m - 1);
+    setSelectedDay(null);
+  };
+  const nextMonth = () => {
+    if (calMonth === 11) { if (calYear < now.getFullYear()) { setCalMonth(0); setCalYear(y => y + 1); } }
+    else if (calYear < now.getFullYear() || calMonth < now.getMonth()) { setCalMonth(m => m + 1); }
+    setSelectedDay(null);
+  };
+
+  const handleExportJSON = () => {
     const data = JSON.stringify(workouts, null, 2);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = 'fitforge-export.json'; a.click();
     URL.revokeObjectURL(url);
-    toast.success('Data exported!');
+    toast.success('JSON exported!');
   };
 
   const handleExportCSV = () => {
@@ -85,7 +107,7 @@ const ProfilePage = () => {
         });
       });
     });
-    const csv = rows.map(r => r.join(',')).join('\n');
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -94,11 +116,84 @@ const ProfilePage = () => {
     toast.success('CSV exported!');
   };
 
+  const handleHevyImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const text = ev.target?.result as string;
+        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length < 2) { toast.error('Empty CSV file'); return; }
+
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+        const titleIdx = headers.findIndex(h => h === 'title' || h === 'workout name');
+        const dateIdx = headers.findIndex(h => h === 'start time' || h === 'date');
+        const exIdx = headers.findIndex(h => h === 'exercise name' || h === 'exercise');
+        const weightIdx = headers.findIndex(h => h.includes('weight'));
+        const repsIdx = headers.findIndex(h => h === 'reps');
+        const setOrderIdx = headers.findIndex(h => h === 'set order' || h === 'set');
+
+        if (exIdx === -1) { toast.error('Could not find exercise column in CSV'); return; }
+
+        const workoutMap = new Map<string, Workout>();
+        let idCounter = Date.now();
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+          const title = titleIdx >= 0 ? cols[titleIdx] : 'Imported Workout';
+          const dateRaw = dateIdx >= 0 ? cols[dateIdx] : new Date().toISOString();
+          const exName = cols[exIdx];
+          const weight = weightIdx >= 0 ? parseFloat(cols[weightIdx]) || 0 : 0;
+          const reps = repsIdx >= 0 ? parseInt(cols[repsIdx]) || 0 : 0;
+
+          if (!exName) continue;
+
+          const dateKey = `${title}-${dateRaw.split(' ')[0]}`;
+          if (!workoutMap.has(dateKey)) {
+            workoutMap.set(dateKey, {
+              id: `hevy-${++idCounter}`,
+              name: title,
+              date: new Date(dateRaw).toISOString() || new Date().toISOString(),
+              exercises: [],
+              completed: true,
+            });
+          }
+
+          const workout = workoutMap.get(dateKey)!;
+          let we = workout.exercises.find(e => e.exercise.name === exName);
+          if (!we) {
+            we = {
+              id: `hevy-ex-${++idCounter}`,
+              exercise: { id: `hevy-${exName.toLowerCase().replace(/\s+/g, '-')}`, name: exName, muscleGroup: 'chest', equipment: 'barbell' },
+              sets: [],
+            };
+            workout.exercises.push(we);
+          }
+          we.sets.push({
+            id: `hevy-set-${++idCounter}`,
+            weight,
+            reps,
+            type: 'normal',
+            completed: true,
+          });
+        }
+
+        const imported = Array.from(workoutMap.values());
+        const merged = [...imported, ...workouts];
+        setWorkouts(merged);
+        toast.success(`Imported ${imported.length} workouts from Hevy!`);
+      } catch {
+        toast.error('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleClearData = async () => {
     if (user) {
-      try {
-        await supabase.from('workouts').delete().eq('user_id', user.id);
-      } catch {}
+      try { await supabase.from('workouts').delete().eq('user_id', user.id); } catch {}
     }
     localStorage.removeItem('fitforge-storage');
     window.location.reload();
@@ -107,7 +202,7 @@ const ProfilePage = () => {
   return (
     <div className="min-h-screen px-4 pt-6 pb-24">
       {/* Profile header */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-5">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center">
             <User className="h-6 w-6 text-muted-foreground" />
@@ -118,46 +213,69 @@ const ProfilePage = () => {
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => setEditingProfile(!editingProfile)}>
-          {editingProfile ? 'Cancel' : 'Edit Profile'}
+          {editingProfile ? 'Cancel' : 'Edit'}
         </Button>
       </motion.div>
 
+      {/* Follower stats + Social link */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="flex gap-3 mb-4">
+        <button onClick={() => navigate('/social')} className="flex-1 rounded-lg border border-border bg-card p-3 text-center hover:border-primary/30 transition-colors">
+          <p className="text-display text-lg">{followerCount}</p>
+          <p className="text-[10px] text-muted-foreground">Followers</p>
+        </button>
+        <button onClick={() => navigate('/social')} className="flex-1 rounded-lg border border-border bg-card p-3 text-center hover:border-primary/30 transition-colors">
+          <p className="text-display text-lg">{followingCount}</p>
+          <p className="text-[10px] text-muted-foreground">Following</p>
+        </button>
+        <button onClick={() => navigate('/social')} className="flex-1 rounded-lg border border-border bg-card p-3 flex flex-col items-center justify-center hover:border-primary/30 transition-colors">
+          <Users className="h-5 w-5 text-primary" />
+          <p className="text-[10px] text-muted-foreground mt-1">Social</p>
+        </button>
+      </motion.div>
+
       {/* Edit profile form */}
-      {editingProfile && (
-        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="rounded-lg border border-border bg-card p-4 mb-4">
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground">Username</label>
-              <Input value={profile.username} onChange={e => setProfile(p => ({ ...p, username: e.target.value }))} className="bg-secondary border-border" />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
+      <AnimatePresence>
+        {editingProfile && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="rounded-lg border border-border bg-card p-4 mb-4 overflow-hidden">
+            <div className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground">Weight (kg)</label>
-                <Input value={profile.weight} onChange={e => setProfile(p => ({ ...p, weight: e.target.value }))} type="number" className="bg-secondary border-border" />
+                <label className="text-xs text-muted-foreground">Username</label>
+                <Input value={profile.username} onChange={e => setProfile(p => ({ ...p, username: e.target.value }))} className="bg-secondary border-border" />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Height (cm)</label>
-                <Input value={profile.height} onChange={e => setProfile(p => ({ ...p, height: e.target.value }))} type="number" className="bg-secondary border-border" />
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Weight (kg)</label>
+                  <Input value={profile.weight} onChange={e => setProfile(p => ({ ...p, weight: e.target.value }))} type="number" className="bg-secondary border-border" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Height (cm)</label>
+                  <Input value={profile.height} onChange={e => setProfile(p => ({ ...p, height: e.target.value }))} type="number" className="bg-secondary border-border" />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Experience</label>
+                  <select value={profile.experience} onChange={e => setProfile(p => ({ ...p, experience: e.target.value }))} className="w-full rounded-md bg-secondary border border-border px-2 py-2 text-sm text-foreground h-10">
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Experience</label>
-                <select
-                  value={profile.experience}
-                  onChange={e => setProfile(p => ({ ...p, experience: e.target.value }))}
-                  className="w-full rounded-md bg-secondary border border-border px-2 py-2 text-sm text-foreground h-10"
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground">Profile Visibility</label>
+                <button
+                  onClick={() => setProfile(p => ({ ...p, isPrivate: !p.isPrivate }))}
+                  className={`px-3 py-1 rounded text-xs ${profile.isPrivate ? 'bg-secondary text-muted-foreground' : 'bg-primary text-primary-foreground'}`}
                 >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
+                  {profile.isPrivate ? 'Private' : 'Public'}
+                </button>
               </div>
+              <Button size="sm" onClick={saveProfile} className="w-full">
+                <Save className="mr-2 h-4 w-4" /> Save Profile
+              </Button>
             </div>
-            <Button size="sm" onClick={saveProfile} className="w-full">
-              <Save className="mr-2 h-4 w-4" /> Save Profile
-            </Button>
-          </div>
-        </motion.div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Stats row */}
       {!editingProfile && (
@@ -177,42 +295,77 @@ const ProfilePage = () => {
         </motion.div>
       )}
 
-      {/* Workout History Calendar */}
+      {/* Workout History Calendar - Clickable & Navigable */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-lg border border-border bg-card p-3 mb-4">
-        <h2 className="font-semibold text-sm mb-2">Workout History</h2>
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={prevMonth} className="p-1 text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-primary" />
+            <h2 className="font-semibold text-sm">{MONTHS[calMonth]} {calYear}</h2>
+          </div>
+          <button onClick={nextMonth} className="p-1 text-muted-foreground hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
+        </div>
         <div className="grid grid-cols-7 gap-1 mb-1">
-          {DAYS.map(d => (
-            <div key={d} className="text-center text-[9px] text-muted-foreground font-medium">{d}</div>
-          ))}
+          {DAYS.map(d => <div key={d} className="text-center text-[9px] text-muted-foreground font-medium">{d}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-1">
-          {calendarData.map((day, i) => (
-            <div
+          {calendarDays.map((day, i) => (
+            <button
               key={i}
-              className={`aspect-square rounded-sm flex items-center justify-center text-[9px] ${
-                !day.isCurrentMonth ? '' : day.hasWorkout
-                  ? 'bg-primary text-primary-foreground font-bold'
-                  : 'bg-secondary text-muted-foreground'
+              onClick={() => day.isCurrentMonth && day.hasWorkout && setSelectedDay(day.dateStr === selectedDay ? null : day.dateStr)}
+              className={`aspect-square rounded-sm flex items-center justify-center text-[9px] transition-colors ${
+                !day.isCurrentMonth ? '' :
+                day.dateStr === selectedDay ? 'ring-1 ring-primary bg-primary text-primary-foreground font-bold' :
+                day.hasWorkout ? 'bg-primary text-primary-foreground font-bold cursor-pointer hover:ring-1 hover:ring-primary/50' :
+                'bg-secondary text-muted-foreground'
               }`}
+              disabled={!day.isCurrentMonth || !day.hasWorkout}
             >
               {day.isCurrentMonth ? day.date : ''}
-            </div>
+            </button>
           ))}
         </div>
+
+        {/* Selected day workouts */}
+        <AnimatePresence>
+          {selectedDay && selectedDayWorkouts.length > 0 && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mt-2 space-y-2 overflow-hidden">
+              <p className="text-xs text-muted-foreground">{new Date(selectedDay).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+              {selectedDayWorkouts.map(w => (
+                <div key={w.id} className="rounded border border-border bg-secondary p-2">
+                  <p className="text-sm font-semibold">{w.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{w.exercises.length} exercises{w.duration ? ` · ${w.duration} min` : ''}</p>
+                  <div className="mt-1 space-y-0.5">
+                    {w.exercises.map(ex => (
+                      <p key={ex.id} className="text-[10px] text-muted-foreground">
+                        {ex.exercise.name}: {ex.sets.length} sets
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Settings */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
         <h2 className="font-semibold text-sm mb-2">Settings</h2>
         <div className="rounded-lg border border-border bg-card divide-y divide-border">
-          <button onClick={handleExport} className="flex w-full items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors">
-            <div className="flex items-center gap-3"><Download className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Export Data (JSON/CSV)</span></div>
+          <button onClick={handleExportJSON} className="flex w-full items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors">
+            <div className="flex items-center gap-3"><Download className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Export JSON</span></div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
           <button onClick={handleExportCSV} className="flex w-full items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors">
             <div className="flex items-center gap-3"><Download className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Export CSV</span></div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
+          <button onClick={() => fileInputRef.current?.click()} className="flex w-full items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors">
+            <div className="flex items-center gap-3"><Upload className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Import Hevy CSV</span></div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleHevyImport} />
           <button onClick={() => setShowClearConfirm(true)} className="flex w-full items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors">
             <div className="flex items-center gap-3"><Trash2 className="h-4 w-4 text-destructive" /><span className="text-sm text-destructive">Clear All Data</span></div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -221,10 +374,6 @@ const ProfilePage = () => {
             <div className="flex items-center gap-3"><Cloud className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Cloud Sync</span></div>
             <span className="text-xs text-primary">Connected</span>
           </div>
-          <button className="flex w-full items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors" onClick={() => toast.info('Hevy import coming soon!')}>
-            <div className="flex items-center gap-3"><Upload className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Import Hevy Data</span></div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </button>
           <button onClick={signOut} className="flex w-full items-center justify-between p-3 text-left hover:bg-secondary/50 transition-colors">
             <div className="flex items-center gap-3"><LogOut className="h-4 w-4 text-muted-foreground" /><span className="text-sm">Sign Out</span></div>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -232,6 +381,7 @@ const ProfilePage = () => {
         </div>
       </motion.div>
 
+      {/* Clear confirm modal */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
           <div className="rounded-lg border border-border bg-card p-6 max-w-sm w-full">

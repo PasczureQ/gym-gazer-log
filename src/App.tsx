@@ -9,6 +9,8 @@ import Index from "./pages/Index";
 import Workouts from "./pages/Workouts";
 import Analytics from "./pages/Analytics";
 import Profile from "./pages/Profile";
+import Social from "./pages/Social";
+import UserProfile from "./pages/UserProfile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { Dumbbell } from "lucide-react";
@@ -36,6 +38,8 @@ const AppRoutes = () => (
       <Route path="/workouts" element={<ProtectedRoute><Workouts /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/social" element={<ProtectedRoute><Social /></ProtectedRoute>} />
+      <Route path="/user/:userId" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
     <BottomNav />

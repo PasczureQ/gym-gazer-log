@@ -5,11 +5,13 @@ import { useMemo, useState } from 'react';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const MIN_YEAR = 1999;
 
 const AnalyticsPage = () => {
   const { workouts } = useWorkoutStore();
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear] = useState(new Date().getFullYear());
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
   const monthlyData = useMemo(() => {
     const data: number[] = Array(12).fill(0);
@@ -49,8 +51,30 @@ const AnalyticsPage = () => {
     return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
   }).length;
 
-  const prevMonth = () => setSelectedMonth(m => m > 0 ? m - 1 : 11);
-  const nextMonth = () => setSelectedMonth(m => m < 11 ? m + 1 : 0);
+  const prevMonth = () => {
+    if (selectedMonth === 0) {
+      if (selectedYear > MIN_YEAR) {
+        setSelectedMonth(11);
+        setSelectedYear(y => y - 1);
+      }
+    } else {
+      setSelectedMonth(m => m - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    const maxYear = now.getFullYear();
+    if (selectedMonth === 11) {
+      if (selectedYear < maxYear) {
+        setSelectedMonth(0);
+        setSelectedYear(y => y + 1);
+      }
+    } else {
+      if (selectedYear < maxYear || selectedMonth < now.getMonth()) {
+        setSelectedMonth(m => m + 1);
+      }
+    }
+  };
 
   return (
     <div className="min-h-screen px-4 pt-6 pb-24">
@@ -58,9 +82,20 @@ const AnalyticsPage = () => {
 
       {/* Monthly volume chart */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-lg border border-border bg-card p-3 mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold text-sm">Monthly Volume ({selectedYear})</h2>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <h2 className="font-semibold text-sm">Monthly Volume</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => selectedYear > MIN_YEAR && setSelectedYear(y => y - 1)} className="p-1 text-muted-foreground hover:text-foreground">
+              <ChevronLeft className="h-3 w-3" />
+            </button>
+            <span className="text-xs font-mono">{selectedYear}</span>
+            <button onClick={() => selectedYear < now.getFullYear() && setSelectedYear(y => y + 1)} className="p-1 text-muted-foreground hover:text-foreground">
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          </div>
         </div>
         <div className="flex items-end gap-0.5 h-24">
           {monthlyData.map((vol, i) => (

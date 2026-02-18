@@ -1,19 +1,26 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { motion } from 'framer-motion';
-import { Dumbbell, Mail, Lock, User, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Dumbbell, Mail, Lock, User, ArrowRight, KeyRound, RefreshCw } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
+type Stage = 'form' | 'otp';
+
 const AuthPage = () => {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, loading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [stage, setStage] = useState<Stage>('form');
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [resending, setResending] = useState(false);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   if (loading) {
     return (
@@ -25,19 +32,116 @@ const AuthPage = () => {
 
   if (user) return <Navigate to="/" replace />;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const getProjectUrl = () => {
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    return `https://${projectId}.supabase.co/functions/v1`;
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    const { error } = await signIn(email, password);
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Incorrect email or password.');
+      } else {
+        setError(error.message);
+      }
+    }
+    setSubmitting(false);
+  };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
 
-    if (isLogin) {
-      const { error } = await signIn(email, password);
-      if (error) setError(error.message);
-    } else {
-      const { error } = await signUp(email, password, username);
-      if (error) setError(error.message);
+    try {
+      const res = await fetch(`${getProjectUrl()}/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to send code');
+      } else {
+        setStage('otp');
+        setOtp(['', '', '', '', '', '']);
+        setTimeout(() => inputRefs.current[0]?.focus(), 100);
+      }
+    } catch {
+      setError('Network error. Please try again.');
     }
     setSubmitting(false);
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (paste.length === 6) {
+      setOtp(paste.split(''));
+      inputRefs.current[5]?.focus();
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const code = otp.join('');
+    if (code.length !== 6) { setError('Please enter all 6 digits'); return; }
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const res = await fetch(`${getProjectUrl()}/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({ email, code, password, username }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Verification failed');
+      } else {
+        // Account created — sign in
+        const { error: signInErr } = await signIn(email, password);
+        if (signInErr) setError('Account created! Please sign in.');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    }
+    setSubmitting(false);
+  };
+
+  const handleResendCode = async () => {
+    setResending(true);
+    setError('');
+    try {
+      const res = await fetch(`${getProjectUrl()}/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data.error || 'Failed to resend');
+      else { setOtp(['', '', '', '', '', '']); inputRefs.current[0]?.focus(); }
+    } catch { setError('Network error.'); }
+    setResending(false);
   };
 
   return (
@@ -51,63 +155,116 @@ const AuthPage = () => {
           <Dumbbell className="mx-auto h-12 w-12 text-primary mb-3" />
           <h1 className="text-display text-4xl tracking-wider">FITFORGE</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {isLogin ? 'Welcome back, beast.' : 'Join the forge.'}
+            {isLogin ? 'Welcome back, beast.' : stage === 'otp' ? 'Check your email.' : 'Join the forge.'}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="Username"
-                className="pl-10 bg-secondary border-border"
-              />
-            </div>
+        <AnimatePresence mode="wait">
+          {/* Login Form */}
+          {isLogin && (
+            <motion.form key="login" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
+              onSubmit={handleLoginSubmit} className="space-y-4">
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="Email" required className="pl-10 bg-secondary border-border" />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Password" required minLength={6} className="pl-10 bg-secondary border-border" />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" className="w-full glow-red" disabled={submitting}>
+                {submitting ? '...' : 'Sign In'} <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </motion.form>
           )}
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Email"
-              required
-              className="pl-10 bg-secondary border-border"
-            />
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="Password"
-              required
-              minLength={6}
-              className="pl-10 bg-secondary border-border"
-            />
-          </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {/* Signup Form */}
+          {!isLogin && stage === 'form' && (
+            <motion.form key="signup" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+              onSubmit={handleSignupSubmit} className="space-y-4">
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={username} onChange={e => setUsername(e.target.value)}
+                  placeholder="Username" className="pl-10 bg-secondary border-border" />
+              </div>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="Email" required className="pl-10 bg-secondary border-border" />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="Password" required minLength={6} className="pl-10 bg-secondary border-border" />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" className="w-full glow-red" disabled={submitting}>
+                {submitting ? 'Sending code...' : 'Get Verification Code'} <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </motion.form>
+          )}
 
-          <Button type="submit" className="w-full glow-red" disabled={submitting}>
-            {submitting ? '...' : isLogin ? 'Sign In' : 'Create Account'}
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </form>
+          {/* OTP Verification */}
+          {!isLogin && stage === 'otp' && (
+            <motion.div key="otp" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+              className="space-y-6">
+              <div className="text-center">
+                <KeyRound className="mx-auto h-10 w-10 text-primary mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  We sent a 6-digit code to<br />
+                  <span className="text-foreground font-medium">{email}</span>
+                </p>
+              </div>
 
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
-          <button
-            onClick={() => { setIsLogin(!isLogin); setError(''); }}
-            className="text-primary font-medium hover:underline"
-          >
-            {isLogin ? 'Sign Up' : 'Sign In'}
-          </button>
-        </p>
+              <div className="flex gap-2 justify-center" onPaste={handleOtpPaste}>
+                {otp.map((digit, i) => (
+                  <input
+                    key={i}
+                    ref={el => { inputRefs.current[i] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={e => handleOtpChange(i, e.target.value)}
+                    onKeyDown={e => handleOtpKeyDown(i, e)}
+                    className="w-11 h-14 text-center text-xl font-bold bg-secondary border border-border rounded-lg text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                  />
+                ))}
+              </div>
+
+              {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
+              <Button onClick={handleVerifyOtp} className="w-full glow-red" disabled={submitting || otp.join('').length !== 6}>
+                {submitting ? 'Verifying...' : 'Verify & Create Account'} <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+
+              <div className="flex items-center justify-between text-sm">
+                <button onClick={() => { setStage('form'); setError(''); }} className="text-muted-foreground hover:text-foreground">
+                  ← Back
+                </button>
+                <button onClick={handleResendCode} disabled={resending} className="text-primary hover:underline flex items-center gap-1">
+                  <RefreshCw className={`h-3 w-3 ${resending ? 'animate-spin' : ''}`} />
+                  {resending ? 'Sending...' : 'Resend code'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {stage === 'form' && (
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button
+              onClick={() => { setIsLogin(!isLogin); setError(''); setStage('form'); }}
+              className="text-primary font-medium hover:underline"
+            >
+              {isLogin ? 'Sign Up' : 'Sign In'}
+            </button>
+          </p>
+        )}
       </motion.div>
     </div>
   );

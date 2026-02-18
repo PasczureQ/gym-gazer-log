@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { User, Download, Upload, Trash2, ChevronRight, LogOut, Save, Cloud, ChevronLeft, Calendar, Users } from 'lucide-react';
+import { User, Download, Upload, Trash2, ChevronRight, LogOut, Save, Cloud, ChevronLeft, Calendar, Info, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const [profile, setProfile] = useState({ username: 'Gym Rat', weight: '', height: '', experience: 'beginner', isPrivate: true });
   const [editingProfile, setEditingProfile] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
@@ -217,7 +218,7 @@ const ProfilePage = () => {
         </Button>
       </motion.div>
 
-      {/* Follower stats + Social link */}
+      {/* Follower stats + Info button */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="flex gap-3 mb-4">
         <button onClick={() => navigate('/social')} className="flex-1 rounded-lg border border-border bg-card p-3 text-center hover:border-primary/30 transition-colors">
           <p className="text-display text-lg">{followerCount}</p>
@@ -227,11 +228,54 @@ const ProfilePage = () => {
           <p className="text-display text-lg">{followingCount}</p>
           <p className="text-[10px] text-muted-foreground">Following</p>
         </button>
-        <button onClick={() => navigate('/social')} className="flex-1 rounded-lg border border-border bg-card p-3 flex flex-col items-center justify-center hover:border-primary/30 transition-colors">
-          <Users className="h-5 w-5 text-primary" />
-          <p className="text-[10px] text-muted-foreground mt-1">Social</p>
+        <button onClick={() => setShowInfoModal(true)} className="flex-1 rounded-lg border border-border bg-card p-3 flex flex-col items-center justify-center hover:border-primary/30 transition-colors">
+          <Info className="h-5 w-5 text-primary" />
+          <p className="text-[10px] text-muted-foreground mt-1">Info</p>
         </button>
       </motion.div>
+
+      {/* Info Modal */}
+      <AnimatePresence>
+        {showInfoModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+            onClick={() => setShowInfoModal(false)}>
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="rounded-xl border border-border bg-card p-6 max-w-sm w-full"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-display text-xl">MY INFO</h3>
+                <button onClick={() => setShowInfoModal(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-sm text-muted-foreground">Weight</span>
+                  <span className="font-semibold">{profile.weight ? `${profile.weight} kg` : '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-sm text-muted-foreground">Height</span>
+                  <span className="font-semibold">{profile.height ? `${profile.height} cm` : '—'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-sm text-muted-foreground">Experience</span>
+                  <span className="font-semibold capitalize">{profile.experience}</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-muted-foreground">Visibility</span>
+                  <span className={`text-xs px-2 py-1 rounded font-medium ${profile.isPrivate ? 'bg-secondary text-muted-foreground' : 'bg-primary/20 text-primary'}`}>
+                    {profile.isPrivate ? 'Private' : 'Public'}
+                  </span>
+                </div>
+              </div>
+              <Button className="w-full mt-4" variant="outline" onClick={() => { setShowInfoModal(false); setEditingProfile(true); }}>
+                Edit Info
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Edit profile form */}
       <AnimatePresence>

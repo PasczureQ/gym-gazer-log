@@ -19,19 +19,29 @@ const SocialPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ProfileResult[]>([]);
+  const [allUsers, setAllUsers] = useState<ProfileResult[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<ProfileResult[]>([]);
   const [following, setFollowing] = useState<string[]>([]);
   const [followers, setFollowers] = useState<ProfileResult[]>([]);
   const [followingProfiles, setFollowingProfiles] = useState<ProfileResult[]>([]);
-  const [tab, setTab] = useState<'search' | 'followers' | 'following'>('search');
-  const [searching, setSearching] = useState(false);
+  const [tab, setTab] = useState<'discover' | 'followers' | 'following'>('discover');
 
   useEffect(() => {
     if (!user) return;
-    loadFollowData();
+    loadAllData();
   }, [user]);
 
-  const loadFollowData = async () => {
+  useEffect(() => {
+    if (query.trim()) {
+      setFilteredUsers(allUsers.filter(u =>
+        u.username.toLowerCase().includes(query.toLowerCase())
+      ));
+    } else {
+      setFilteredUsers(allUsers);
+    }
+  }, [query, allUsers]);
+
+  const loadAllData = async () => {
     if (!user) return;
 
     // Get who I follow
@@ -42,6 +52,15 @@ const SocialPage = () => {
     const followingIds = (followingData || []).map(f => f.following_id);
     setFollowing(followingIds);
 
+    // Load ALL users except self
+    const { data: allProfiles } = await supabase
+      .from('profiles')
+      .select('user_id, username, experience, is_private')
+      .neq('user_id', user.id)
+      .order('username');
+    setAllUsers(allProfiles || []);
+    setFilteredUsers(allProfiles || []);
+
     // Get following profiles
     if (followingIds.length > 0) {
       const { data: fProfiles } = await supabase
@@ -49,6 +68,8 @@ const SocialPage = () => {
         .select('user_id, username, experience, is_private')
         .in('user_id', followingIds);
       setFollowingProfiles(fProfiles || []);
+    } else {
+      setFollowingProfiles([]);
     }
 
     // Get my followers
@@ -64,37 +85,28 @@ const SocialPage = () => {
         .select('user_id, username, experience, is_private')
         .in('user_id', followerIds);
       setFollowers(fProfiles || []);
+    } else {
+      setFollowers([]);
     }
-  };
-
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-    setSearching(true);
-    const { data } = await supabase
-      .from('profiles')
-      .select('user_id, username, experience, is_private')
-      .ilike('username', `%${query.trim()}%`)
-      .neq('user_id', user?.id || '')
-      .limit(20);
-    setResults(data || []);
-    setSearching(false);
   };
 
   const handleFollow = async (targetId: string) => {
     if (!user) return;
     const { error } = await supabase.from('followers').insert({ follower_id: user.id, following_id: targetId });
     if (error) { toast.error('Failed to follow'); return; }
-    setFollowing([...following, targetId]);
+    const newFollowing = [...following, targetId];
+    setFollowing(newFollowing);
     toast.success('Followed!');
-    loadFollowData();
+    const profile = allUsers.find(u => u.user_id === targetId);
+    if (profile) setFollowingProfiles(prev => [...prev, profile]);
   };
 
   const handleUnfollow = async (targetId: string) => {
     if (!user) return;
     await supabase.from('followers').delete().eq('follower_id', user.id).eq('following_id', targetId);
     setFollowing(following.filter(id => id !== targetId));
+    setFollowingProfiles(prev => prev.filter(p => p.user_id !== targetId));
     toast.success('Unfollowed');
-    loadFollowData();
   };
 
   const renderUserCard = (p: ProfileResult) => {
@@ -106,21 +118,21 @@ const SocialPage = () => {
         animate={{ opacity: 1, y: 0 }}
         className="flex items-center justify-between rounded-lg border border-border bg-card p-3"
       >
-        <button onClick={() => navigate(`/user/${p.user_id}`)} className="flex items-center gap-3 text-left flex-1">
-          <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+        <button onClick={() => navigate(`/user/${p.user_id}`)} className="flex items-center gap-3 text-left flex-1 min-w-0">
+          <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
             <User className="h-5 w-5 text-muted-foreground" />
           </div>
-          <div>
-            <p className="font-semibold text-sm">{p.username}</p>
+          <div className="min-w-0">
+            <p className="font-semibold text-sm truncate">{p.username}</p>
             <p className="text-[10px] text-muted-foreground capitalize">{p.experience || 'Beginner'} {p.is_private ? '· Private' : '· Public'}</p>
           </div>
         </button>
         {isFollowing ? (
-          <Button variant="outline" size="sm" onClick={() => handleUnfollow(p.user_id)}>
+          <Button variant="outline" size="sm" onClick={() => handleUnfollow(p.user_id)} className="ml-2 shrink-0">
             <UserMinus className="h-3 w-3 mr-1" /> Unfollow
           </Button>
         ) : (
-          <Button size="sm" onClick={() => handleFollow(p.user_id)}>
+          <Button size="sm" onClick={() => handleFollow(p.user_id)} className="ml-2 shrink-0">
             <UserPlus className="h-3 w-3 mr-1" /> Follow
           </Button>
         )}
@@ -135,44 +147,41 @@ const SocialPage = () => {
         <h1 className="text-display text-3xl">SOCIAL</h1>
       </div>
 
-      {/* Search */}
-      <div className="flex gap-2 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            placeholder="Search users..."
-            className="pl-10 bg-secondary border-border"
-          />
-        </div>
-        <Button onClick={handleSearch} disabled={searching}>
-          <Search className="h-4 w-4" />
-        </Button>
+      {/* Search bar */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Search users..."
+          className="pl-10 bg-secondary border-border"
+        />
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 rounded-lg bg-secondary p-1">
-        {(['search', 'followers', 'following'] as const).map(t => (
+        {(['discover', 'followers', 'following'] as const).map(t => (
           <button
             key={t}
             className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors capitalize ${tab === t ? 'bg-card text-foreground' : 'text-muted-foreground'}`}
             onClick={() => setTab(t)}
           >
-            {t} {t === 'followers' ? `(${followers.length})` : t === 'following' ? `(${followingProfiles.length})` : ''}
+            {t === 'discover' ? 'Discover' : t === 'followers' ? `Followers (${followers.length})` : `Following (${followingProfiles.length})`}
           </button>
         ))}
       </div>
 
       {/* Content */}
       <div className="space-y-2">
-        {tab === 'search' && (
+        {tab === 'discover' && (
           <>
-            {results.length === 0 && query && !searching && (
-              <p className="text-sm text-muted-foreground text-center py-8">No users found</p>
+            {filteredUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {query ? 'No users found' : 'No other users yet'}
+              </p>
+            ) : (
+              filteredUsers.map(p => <div key={p.user_id}>{renderUserCard(p)}</div>)
             )}
-            {results.map(renderUserCard)}
           </>
         )}
         {tab === 'followers' && (
@@ -180,7 +189,7 @@ const SocialPage = () => {
             {followers.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-8">No followers yet</p>
             )}
-            {followers.map(renderUserCard)}
+            {followers.map(p => <div key={p.user_id}>{renderUserCard(p)}</div>)}
           </>
         )}
         {tab === 'following' && (
@@ -188,7 +197,7 @@ const SocialPage = () => {
             {followingProfiles.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-8">Not following anyone yet</p>
             )}
-            {followingProfiles.map(renderUserCard)}
+            {followingProfiles.map(p => <div key={p.user_id}>{renderUserCard(p)}</div>)}
           </>
         )}
       </div>

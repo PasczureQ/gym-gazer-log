@@ -321,23 +321,6 @@ const ProfilePage = () => {
         )}
       </AnimatePresence>
 
-      {/* Stats row */}
-      {!editingProfile && (
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="grid grid-cols-3 gap-2 mb-4">
-          <div className="rounded-lg border border-border bg-card p-3 text-center">
-            <p className="text-xs text-muted-foreground">Weight</p>
-            <p className="text-display text-lg">{profile.weight || '—'}<span className="text-xs text-muted-foreground">kg</span></p>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-3 text-center">
-            <p className="text-xs text-muted-foreground">Height</p>
-            <p className="text-display text-lg">{profile.height || '—'}<span className="text-xs text-muted-foreground">cm</span></p>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-3 text-center">
-            <p className="text-xs text-muted-foreground">Experience</p>
-            <p className="text-display text-sm capitalize">{profile.experience}</p>
-          </div>
-        </motion.div>
-      )}
 
       {/* Workout History Calendar - Clickable & Navigable */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-lg border border-border bg-card p-3 mb-4">

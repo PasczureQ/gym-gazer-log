@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6.9.14';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +47,6 @@ Deno.serve(async (req) => {
       expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     });
 
-    // Send email via Supabase's built-in SMTP
     const emailBody = `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0a0a; color: #fff; padding: 32px; border-radius: 12px;">
         <div style="text-align: center; margin-bottom: 24px;">
@@ -61,27 +61,23 @@ Deno.serve(async (req) => {
       </div>
     `;
 
-    // Use Resend or Supabase SMTP — we use the Supabase admin email
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    const GMAIL_APP_PASSWORD = Deno.env.get('GMAIL_APP_PASSWORD');
 
-    if (RESEND_API_KEY) {
-      const resendRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
+    if (GMAIL_APP_PASSWORD) {
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: 'verify.fitforge@gmail.com',
+          pass: GMAIL_APP_PASSWORD,
         },
-        body: JSON.stringify({
-          from: 'FitForge <onboarding@resend.dev>',
-          to: [email],
-          subject: `${code} is your FitForge verification code`,
-          html: emailBody,
-        }),
       });
-      if (!resendRes.ok) {
-        const errBody = await resendRes.text();
-        console.error('Resend error:', errBody);
-      }
+
+      await transporter.sendMail({
+        from: '"FitForge" <verify.fitforge@gmail.com>',
+        to: email,
+        subject: `${code} is your FitForge verification code`,
+        html: emailBody,
+      });
     } else {
       console.log(`[DEV] OTP for ${email}: ${code}`);
     }

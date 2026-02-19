@@ -65,29 +65,25 @@ Deno.serve(async (req) => {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
     if (RESEND_API_KEY) {
-      await fetch('https://api.resend.com/emails', {
+      const resendRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'FitForge <noreply@fitforge.app>',
+          from: 'FitForge <onboarding@resend.dev>',
           to: [email],
           subject: `${code} is your FitForge verification code`,
           html: emailBody,
         }),
       });
+      if (!resendRes.ok) {
+        const errBody = await resendRes.text();
+        console.error('Resend error:', errBody);
+      }
     } else {
-      // Fallback: use Supabase built-in auth OTP (magic link style)
-      // We'll use the admin API to send a custom email via the auth system
-      await supabase.auth.admin.generateLink({
-        type: 'signup',
-        email: email,
-      });
-      // Since we can't use Resend, we store the code and inform the client
-      // The code is still stored in DB — frontend will handle display
-      console.log(`OTP for ${email}: ${code}`);
+      console.log(`[DEV] OTP for ${email}: ${code}`);
     }
 
     return new Response(JSON.stringify({ success: true }), {

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { Workout, WorkoutExercise, WorkoutSet } from '@/types/workout';
+import { Workout, WorkoutExercise, WorkoutSet, MuscleGroup, Equipment } from '@/types/workout';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -117,6 +117,61 @@ const ProfilePage = () => {
     toast.success('CSV exported!');
   };
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"' && line[i + 1] === '"') { current += '"'; i++; }
+        else if (ch === '"') { inQuotes = false; }
+        else { current += ch; }
+      } else {
+        if (ch === '"') { inQuotes = true; }
+        else if (ch === ',') { result.push(current); current = ''; }
+        else { current += ch; }
+      }
+    }
+    result.push(current);
+    return result;
+  };
+
+  const parseHevyDate = (dateStr: string): Date => {
+    // "19 Feb 2026, 14:23"
+    const match = dateStr.match(/(\d+)\s+(\w+)\s+(\d{4}),?\s+(\d+):(\d+)/);
+    if (!match) return new Date(dateStr);
+    const [, day, monthStr, year, hour, min] = match;
+    const monthIndex = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(monthStr.toLowerCase());
+    return new Date(Number(year), monthIndex, Number(day), Number(hour), Number(min));
+  };
+
+  const guessEquipment = (name: string): Equipment => {
+    const n = name.toLowerCase();
+    if (n.includes('(dumbbell)')) return 'dumbbell';
+    if (n.includes('(barbell)')) return 'barbell';
+    if (n.includes('(machine)')) return 'machine';
+    if (n.includes('(cable)')) return 'cable';
+    if (n.includes('(smith machine)')) return 'smith_machine';
+    if (n.includes('(bodyweight)')) return 'bodyweight';
+    return 'machine';
+  };
+
+  const guessMuscleGroup = (name: string): MuscleGroup => {
+    const n = name.toLowerCase();
+    if (n.includes('bench') || n.includes('chest') || n.includes('fly') || n.includes('pushup')) return 'chest';
+    if (n.includes('row') || n.includes('pulldown') || n.includes('pull up') || n.includes('pullover') || n.includes('lat')) return 'back';
+    if (n.includes('squat') || n.includes('leg press') || n.includes('leg ext') || n.includes('lunge')) return 'quads';
+    if (n.includes('curl') && !n.includes('leg curl')) return 'biceps';
+    if (n.includes('tricep') || n.includes('pushdown') || n.includes('jm press')) return 'triceps';
+    if (n.includes('shoulder') || n.includes('overhead') || n.includes('lateral raise') || n.includes('delt')) return 'shoulders';
+    if (n.includes('leg curl') || n.includes('hamstring')) return 'hamstrings';
+    if (n.includes('crunch') || n.includes('ab') || n.includes('plank')) return 'core';
+    if (n.includes('calf')) return 'calves';
+    if (n.includes('deadlift') || n.includes('hack')) return 'glutes';
+    return 'chest';
+  };
+
   const handleHevyImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -127,35 +182,44 @@ const ProfilePage = () => {
         const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
         if (lines.length < 2) { toast.error('Empty CSV file'); return; }
 
-        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
-        const titleIdx = headers.findIndex(h => h === 'title' || h === 'workout name');
-        const dateIdx = headers.findIndex(h => h === 'start time' || h === 'date');
-        const exIdx = headers.findIndex(h => h === 'exercise name' || h === 'exercise');
-        const weightIdx = headers.findIndex(h => h.includes('weight'));
-        const repsIdx = headers.findIndex(h => h === 'reps');
-        const setOrderIdx = headers.findIndex(h => h === 'set order' || h === 'set');
+        const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase());
+        const col = (name: string) => headers.indexOf(name);
+        const titleIdx = col('title');
+        const startIdx = col('start_time');
+        const endIdx = col('end_time');
+        const exIdx = col('exercise_title');
+        const weightIdx = col('weight_kg');
+        const repsIdx = col('reps');
+        const setTypeIdx = col('set_type');
 
-        if (exIdx === -1) { toast.error('Could not find exercise column in CSV'); return; }
+        if (exIdx === -1) { toast.error('Could not find exercise_title column'); return; }
 
         const workoutMap = new Map<string, Workout>();
         let idCounter = Date.now();
 
         for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+          const cols = parseCSVLine(lines[i]);
           const title = titleIdx >= 0 ? cols[titleIdx] : 'Imported Workout';
-          const dateRaw = dateIdx >= 0 ? cols[dateIdx] : new Date().toISOString();
+          const startRaw = startIdx >= 0 ? cols[startIdx] : '';
+          const endRaw = endIdx >= 0 ? cols[endIdx] : '';
           const exName = cols[exIdx];
           const weight = weightIdx >= 0 ? parseFloat(cols[weightIdx]) || 0 : 0;
           const reps = repsIdx >= 0 ? parseInt(cols[repsIdx]) || 0 : 0;
+          const setType = setTypeIdx >= 0 ? (cols[setTypeIdx] || 'normal') : 'normal';
 
           if (!exName) continue;
 
-          const dateKey = `${title}-${dateRaw.split(' ')[0]}`;
+          const startDate = startRaw ? parseHevyDate(startRaw) : new Date();
+          const endDate = endRaw ? parseHevyDate(endRaw) : startDate;
+          const durationMin = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+
+          const dateKey = `${title}-${startRaw}`;
           if (!workoutMap.has(dateKey)) {
             workoutMap.set(dateKey, {
               id: `hevy-${++idCounter}`,
               name: title,
-              date: new Date(dateRaw).toISOString() || new Date().toISOString(),
+              date: startDate.toISOString(),
+              duration: durationMin > 0 ? durationMin : undefined,
               exercises: [],
               completed: true,
             });
@@ -166,7 +230,12 @@ const ProfilePage = () => {
           if (!we) {
             we = {
               id: `hevy-ex-${++idCounter}`,
-              exercise: { id: `hevy-${exName.toLowerCase().replace(/\s+/g, '-')}`, name: exName, muscleGroup: 'chest', equipment: 'barbell' },
+              exercise: {
+                id: `hevy-${exName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`,
+                name: exName,
+                muscleGroup: guessMuscleGroup(exName),
+                equipment: guessEquipment(exName),
+              },
               sets: [],
             };
             workout.exercises.push(we);
@@ -175,16 +244,20 @@ const ProfilePage = () => {
             id: `hevy-set-${++idCounter}`,
             weight,
             reps,
-            type: 'normal',
+            type: setType === 'warmup' ? 'warmup' : setType === 'failure' ? 'failure' : 'normal',
             completed: true,
           });
         }
 
         const imported = Array.from(workoutMap.values());
-        const merged = [...imported, ...workouts];
+        // Deduplicate: skip imported workouts that match existing by name+date
+        const existingKeys = new Set(workouts.map(w => `${w.name}-${w.date}`));
+        const newWorkouts = imported.filter(w => !existingKeys.has(`${w.name}-${w.date}`));
+        const merged = [...newWorkouts, ...workouts];
         setWorkouts(merged);
-        toast.success(`Imported ${imported.length} workouts from Hevy!`);
-      } catch {
+        toast.success(`Imported ${newWorkouts.length} workouts from Hevy! (${imported.length - newWorkouts.length} duplicates skipped)`);
+      } catch (err) {
+        console.error('Hevy import error:', err);
         toast.error('Failed to parse CSV file');
       }
     };

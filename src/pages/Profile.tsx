@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { saveWorkoutToCloud } from '@/lib/cloudSync';
 import { User, Download, Upload, Trash2, ChevronRight, LogOut, Save, Cloud, ChevronLeft, Calendar, Info, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -176,7 +177,7 @@ const ProfilePage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         const text = ev.target?.result as string;
         const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -255,7 +256,22 @@ const ProfilePage = () => {
         const newWorkouts = imported.filter(w => !existingKeys.has(`${w.name}-${w.date}`));
         const merged = [...newWorkouts, ...workouts];
         setWorkouts(merged);
-        toast.success(`Imported ${newWorkouts.length} workouts from Hevy! (${imported.length - newWorkouts.length} duplicates skipped)`);
+
+        // Sync to cloud database
+        if (user) {
+          let cloudSaved = 0;
+          const batchSize = 5;
+          for (let b = 0; b < newWorkouts.length; b += batchSize) {
+            const batch = newWorkouts.slice(b, b + batchSize);
+            const results = await Promise.allSettled(
+              batch.map(w => saveWorkoutToCloud(w, user.id))
+            );
+            cloudSaved += results.filter(r => r.status === 'fulfilled').length;
+          }
+          toast.success(`Imported ${newWorkouts.length} workouts from Hevy! (${cloudSaved} synced to cloud, ${imported.length - newWorkouts.length} duplicates skipped)`);
+        } else {
+          toast.success(`Imported ${newWorkouts.length} workouts from Hevy! (${imported.length - newWorkouts.length} duplicates skipped)`);
+        }
       } catch (err) {
         console.error('Hevy import error:', err);
         toast.error('Failed to parse CSV file');

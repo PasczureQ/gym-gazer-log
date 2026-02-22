@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useWorkoutStore } from '@/stores/workoutStore';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Minus, Plus, X } from 'lucide-react';
 
 interface RestTimerProps {
@@ -20,7 +19,6 @@ export function RestTimer({ seconds, onDismiss }: RestTimerProps) {
 
   useEffect(() => {
     if (remaining <= 0) {
-      // Play a subtle vibration if available
       if (navigator.vibrate) navigator.vibrate(200);
       return;
     }
@@ -41,6 +39,9 @@ export function RestTimer({ seconds, onDismiss }: RestTimerProps) {
     setRemaining(r => Math.max(0, r + delta));
   };
 
+  const circumference = 2 * Math.PI * 44;
+  const strokeDashoffset = circumference * (1 - progress / 100);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 50 }}
@@ -48,45 +49,52 @@ export function RestTimer({ seconds, onDismiss }: RestTimerProps) {
       exit={{ opacity: 0, y: 50 }}
       className="fixed inset-x-0 bottom-16 z-50 mx-4 mb-2"
     >
-      <div className="rounded-xl border border-border bg-destructive p-4 shadow-lg">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-destructive-foreground">REST TIMER</span>
-          <button onClick={onDismiss} className="text-destructive-foreground/70 hover:text-destructive-foreground">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-xl" style={{ boxShadow: '0 -8px 40px hsl(4, 80%, 56%, 0.15)' }}>
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs font-bold text-primary uppercase tracking-wider">Rest Timer</span>
+          <button onClick={onDismiss} className="text-muted-foreground hover:text-foreground transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
         
-        <div className="text-center mb-3">
-          <p className="text-display text-5xl text-destructive-foreground font-bold tracking-wider">
-            {remaining <= 0 ? 'GO!' : timeStr}
-          </p>
-        </div>
-
-        {/* Progress bar */}
-        <div className="h-1.5 rounded-full bg-destructive-foreground/20 overflow-hidden mb-3">
-          <motion.div
-            className="h-full bg-destructive-foreground rounded-full"
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5 }}
-          />
+        <div className="flex items-center justify-center mb-4">
+          <div className="relative">
+            <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" fill="none" stroke="hsl(220, 12%, 16%)" strokeWidth="4" />
+              <circle
+                cx="50" cy="50" r="44" fill="none"
+                stroke="hsl(4, 80%, 56%)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-500"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-display text-3xl tracking-wider">
+                {remaining <= 0 ? 'GO!' : timeStr}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center justify-center gap-4">
           <Button
             variant="outline"
             size="sm"
-            className="border-destructive-foreground/30 text-destructive-foreground hover:bg-destructive-foreground/10"
+            className="text-xs"
             onClick={() => adjustTime(-15)}
           >
             <Minus className="h-3 w-3 mr-1" /> 15s
           </Button>
-          <span className="text-xs text-destructive-foreground/70">
-            Default: {Math.floor(restTimerSeconds / 60)}:{String(restTimerSeconds % 60).padStart(2, '0')}
+          <span className="text-[10px] text-muted-foreground font-mono">
+            {Math.floor(restTimerSeconds / 60)}:{String(restTimerSeconds % 60).padStart(2, '0')}
           </span>
           <Button
             variant="outline"
             size="sm"
-            className="border-destructive-foreground/30 text-destructive-foreground hover:bg-destructive-foreground/10"
+            className="text-xs"
             onClick={() => adjustTime(15)}
           >
             <Plus className="h-3 w-3 mr-1" /> 15s
@@ -95,10 +103,10 @@ export function RestTimer({ seconds, onDismiss }: RestTimerProps) {
 
         {remaining <= 0 && (
           <Button
-            className="w-full mt-3 bg-destructive-foreground text-destructive hover:bg-destructive-foreground/90"
+            className="w-full mt-4 glow-red"
             onClick={onDismiss}
           >
-            Dismiss
+            Let's Go
           </Button>
         )}
       </div>

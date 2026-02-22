@@ -56,7 +56,6 @@ const AuthPage = () => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
-
     try {
       const res = await fetch(`${getProjectUrl()}/send-otp`, {
         method: 'POST',
@@ -82,24 +81,17 @@ const AuthPage = () => {
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
+    if (value && index < 5) inputRefs.current[index + 1]?.focus();
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
+    if (e.key === 'Backspace' && !otp[index] && index > 0) inputRefs.current[index - 1]?.focus();
   };
 
   const handleOtpPaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
     const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (paste.length === 6) {
-      setOtp(paste.split(''));
-      inputRefs.current[5]?.focus();
-    }
+    if (paste.length === 6) { setOtp(paste.split('')); inputRefs.current[5]?.focus(); }
   };
 
   const handleVerifyOtp = async () => {
@@ -107,7 +99,6 @@ const AuthPage = () => {
     if (code.length !== 6) { setError('Please enter all 6 digits'); return; }
     setError('');
     setSubmitting(true);
-
     try {
       const res = await fetch(`${getProjectUrl()}/verify-otp`, {
         method: 'POST',
@@ -115,16 +106,12 @@ const AuthPage = () => {
         body: JSON.stringify({ email, code, password, username }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Verification failed');
-      } else {
-        // Account created — sign in
+      if (!res.ok) { setError(data.error || 'Verification failed'); }
+      else {
         const { error: signInErr } = await signIn(email, password);
         if (signInErr) setError('Account created! Please sign in.');
       }
-    } catch {
-      setError('Network error. Please try again.');
-    }
+    } catch { setError('Network error. Please try again.'); }
     setSubmitting(false);
   };
 
@@ -145,74 +132,79 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-6 relative overflow-hidden">
+      {/* Background glow */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full opacity-20 blur-[120px]" style={{ background: 'hsl(4, 80%, 50%)' }} />
+
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm"
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-sm relative z-10"
       >
-        <div className="mb-8 text-center">
-          <Dumbbell className="mx-auto h-12 w-12 text-primary mb-3" />
-          <h1 className="text-display text-4xl tracking-wider">FITFORGE</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+        <div className="mb-10 text-center">
+          <div className="mx-auto h-16 w-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+            <Dumbbell className="h-8 w-8 text-primary" />
+          </div>
+          <h1 className="text-display text-5xl tracking-wider gradient-text">FITFORGE</h1>
+          <p className="text-muted-foreground text-sm mt-2">
             {isLogin ? 'Welcome back, beast.' : stage === 'otp' ? 'Check your email.' : 'Join the forge.'}
           </p>
         </div>
 
         <AnimatePresence mode="wait">
-          {/* Login Form */}
           {isLogin && (
             <motion.form key="login" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
               onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="Email" required className="pl-10 bg-secondary border-border" />
+                  placeholder="Email" required className="pl-10 bg-secondary border-border h-12 rounded-xl" />
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="Password" required minLength={6} className="pl-10 bg-secondary border-border" />
+                  placeholder="Password" required minLength={6} className="pl-10 bg-secondary border-border h-12 rounded-xl" />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full glow-red" disabled={submitting}>
+              {error && <p className="text-sm text-destructive text-center">{error}</p>}
+              <Button type="submit" className="w-full h-12 text-base glow-red rounded-xl" disabled={submitting}>
                 {submitting ? '...' : 'Sign In'} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </motion.form>
           )}
 
-          {/* Signup Form */}
           {!isLogin && stage === 'form' && (
             <motion.form key="signup" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
               onSubmit={handleSignupSubmit} className="space-y-4">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input value={username} onChange={e => setUsername(e.target.value)}
-                  placeholder="Username" className="pl-10 bg-secondary border-border" />
+                  placeholder="Username" className="pl-10 bg-secondary border-border h-12 rounded-xl" />
               </div>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="Email" required className="pl-10 bg-secondary border-border" />
+                  placeholder="Email" required className="pl-10 bg-secondary border-border h-12 rounded-xl" />
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="Password" required minLength={6} className="pl-10 bg-secondary border-border" />
+                  placeholder="Password" required minLength={6} className="pl-10 bg-secondary border-border h-12 rounded-xl" />
               </div>
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              <Button type="submit" className="w-full glow-red" disabled={submitting}>
+              {error && <p className="text-sm text-destructive text-center">{error}</p>}
+              <Button type="submit" className="w-full h-12 text-base glow-red rounded-xl" disabled={submitting}>
                 {submitting ? 'Sending code...' : 'Get Verification Code'} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </motion.form>
           )}
 
-          {/* OTP Verification */}
           {!isLogin && stage === 'otp' && (
             <motion.div key="otp" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
               className="space-y-6">
               <div className="text-center">
-                <KeyRound className="mx-auto h-10 w-10 text-primary mb-2" />
+                <div className="mx-auto h-14 w-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
+                  <KeyRound className="h-7 w-7 text-primary" />
+                </div>
                 <p className="text-sm text-muted-foreground">
                   We sent a 6-digit code to<br />
                   <span className="text-foreground font-medium">{email}</span>
@@ -230,19 +222,19 @@ const AuthPage = () => {
                     value={digit}
                     onChange={e => handleOtpChange(i, e.target.value)}
                     onKeyDown={e => handleOtpKeyDown(i, e)}
-                    className="w-11 h-14 text-center text-xl font-bold bg-secondary border border-border rounded-lg text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-colors"
+                    className="w-11 h-14 text-center text-xl font-bold bg-secondary border border-border rounded-xl text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                   />
                 ))}
               </div>
 
               {error && <p className="text-sm text-destructive text-center">{error}</p>}
 
-              <Button onClick={handleVerifyOtp} className="w-full glow-red" disabled={submitting || otp.join('').length !== 6}>
+              <Button onClick={handleVerifyOtp} className="w-full h-12 glow-red rounded-xl" disabled={submitting || otp.join('').length !== 6}>
                 {submitting ? 'Verifying...' : 'Verify & Create Account'} <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
 
               <div className="flex items-center justify-between text-sm">
-                <button onClick={() => { setStage('form'); setError(''); }} className="text-muted-foreground hover:text-foreground">
+                <button onClick={() => { setStage('form'); setError(''); }} className="text-muted-foreground hover:text-foreground transition-colors">
                   ← Back
                 </button>
                 <button onClick={handleResendCode} disabled={resending} className="text-primary hover:underline flex items-center gap-1">
@@ -255,7 +247,7 @@ const AuthPage = () => {
         </AnimatePresence>
 
         {stage === 'form' && (
-          <p className="mt-6 text-center text-sm text-muted-foreground">
+          <p className="mt-8 text-center text-sm text-muted-foreground">
             {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
             <button
               onClick={() => { setIsLogin(!isLogin); setError(''); setStage('form'); }}

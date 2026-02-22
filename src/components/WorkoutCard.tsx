@@ -1,6 +1,7 @@
 import { Workout, MUSCLE_GROUP_LABELS } from '@/types/workout';
 import { formatDistanceToNow } from 'date-fns';
-import { Clock, Dumbbell, Trash2 } from 'lucide-react';
+import { Clock, Dumbbell, Trash2, ChevronRight, Weight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface WorkoutCardProps {
   workout: Workout;
@@ -15,41 +16,42 @@ export function WorkoutCard({ workout, onDelete }: WorkoutCardProps) {
   const muscleGroups = [...new Set(workout.exercises.map(e => e.exercise.muscleGroup))];
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4 card-hover">
+    <div className="rounded-xl border border-border bg-card p-4 card-hover group">
       <div className="flex items-start justify-between mb-2">
-        <div>
-          <h3 className="font-semibold text-lg">{workout.name}</h3>
-          <p className="text-xs text-muted-foreground">
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-base truncate">{workout.name}</h3>
+          <p className="text-[10px] text-muted-foreground">
             {formatDistanceToNow(new Date(workout.date), { addSuffix: true })}
           </p>
         </div>
         {onDelete && (
-          <button onClick={() => onDelete(workout.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1">
+          <button onClick={() => onDelete(workout.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1 opacity-0 group-hover:opacity-100">
             <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      <div className="flex gap-3 text-sm text-muted-foreground mb-3">
+      <div className="flex gap-3 text-[11px] text-muted-foreground mb-3">
         {workout.duration && (
-          <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{workout.duration}m</span>
+          <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{workout.duration}m</span>
         )}
-        <span className="flex items-center gap-1"><Dumbbell className="h-3.5 w-3.5" />{totalSets} sets</span>
-        {totalVolume > 0 && <span>{(totalVolume / 1000).toFixed(1)}t vol</span>}
+        <span className="flex items-center gap-1"><Dumbbell className="h-3 w-3" />{totalSets} sets</span>
+        {totalVolume > 0 && <span className="flex items-center gap-1"><Weight className="h-3 w-3" />{(totalVolume / 1000).toFixed(1)}t</span>}
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 mb-3">
         {muscleGroups.map(mg => (
-          <span key={mg} className="text-xs bg-primary/15 text-primary rounded-full px-2 py-0.5">
+          <span key={mg} className="text-[9px] bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">
             {MUSCLE_GROUP_LABELS[mg]}
           </span>
         ))}
       </div>
 
-      <div className="mt-3 space-y-1">
+      <div className="space-y-1">
         {workout.exercises.map(we => (
-          <div key={we.id} className="text-sm text-secondary-foreground">
-            {we.sets.length}× {we.exercise.name}
+          <div key={we.id} className="flex items-center justify-between text-xs text-secondary-foreground">
+            <span className="truncate">{we.exercise.name}</span>
+            <span className="text-muted-foreground text-[10px] shrink-0 ml-2">{we.sets.length}×</span>
           </div>
         ))}
       </div>

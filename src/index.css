@@ -6,15 +6,16 @@
 
 @layer base {
   :root {
-    /* Core Colors - Black & Red Only */
+    /* ===== CORE COLORS (BLACK + RED ONLY) ===== */
+
     --background: 0 0% 0%;
-    --foreground: 0 0% 95%;
+    --foreground: 0 0% 96%;
 
-    --card: 0 0% 5%;
-    --card-foreground: 0 0% 95%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 0 0% 5%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 96%;
 
     --primary: 0 100% 50%;
     --primary-foreground: 0 0% 100%;
@@ -37,23 +38,8 @@
 
     --radius: 0.5rem;
 
-    /* Status */
-    --success: 0 100% 50%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 0 100% 50%;
-    --warning-foreground: 0 0% 100%;
-
-    --info: 0 100% 50%;
-    --info-foreground: 0 0% 100%;
-
-    /* Fonts */
-    --font-display: 'Bebas Neue', sans-serif;
-    --font-body: 'Inter', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
-
     /* Sidebar */
-    --sidebar-background: 0 0% 3%;
+    --sidebar-background: 0 0% 4%;
     --sidebar-foreground: 0 0% 85%;
     --sidebar-primary: 0 100% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -61,6 +47,11 @@
     --sidebar-accent-foreground: 0 0% 85%;
     --sidebar-border: 0 0% 15%;
     --sidebar-ring: 0 100% 50%;
+
+    /* Fonts */
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
   }
 }
 
@@ -81,18 +72,27 @@
     letter-spacing: 0.05em;
   }
 
-  /* Minimal Scrollbar */
+  /* Minimal scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
 
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
   ::-webkit-scrollbar-thumb {
     background: hsl(0, 0%, 20%);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(0, 0%, 30%);
   }
 }
 
 @layer utilities {
+
   .text-display {
     font-family: var(--font-display);
     letter-spacing: 0.05em;
@@ -112,7 +112,7 @@
   }
 
   .glass-card {
-    background: hsl(0, 0%, 5%);
+    background: hsl(0, 0%, 6%);
     border: 1px solid hsl(0, 0%, 15%);
   }
 
